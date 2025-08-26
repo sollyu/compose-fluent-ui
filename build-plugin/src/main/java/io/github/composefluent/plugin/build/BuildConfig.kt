@@ -8,7 +8,7 @@ object BuildConfig {
 
     const val packageName = "io.github.composefluent"
 
-    internal const val snapshotLibraryVersion = "0.1.0-SNAPSHOT"
+    internal const val snapshotLibraryVersion = "0.2.0-SNAPSHOT"
 
     val isRelease = System.getenv("PROJECT_BUILD_TYPE") == "release"
 
