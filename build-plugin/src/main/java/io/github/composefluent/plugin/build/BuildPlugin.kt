@@ -172,12 +172,13 @@ class BuildPlugin : Plugin<Project> {
             }
 
         libraryVersion = when {
-            isRelease -> gitTag
+            isRelease -> gitTag.removePrefix("V").removePrefix("v")
             else -> snapshotLibraryVersion
         }
 
         integerVersionName = libraryVersion
             .removePrefix("v")
+            .removePrefix("V")
             .removeSuffix("-SNAPSHOT")
             .substringBefore("-dev")
             .let {
