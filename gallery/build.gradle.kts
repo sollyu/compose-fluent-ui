@@ -2,13 +2,23 @@ import com.android.build.api.variant.impl.VariantOutputImpl
 import com.codingfeline.buildkonfig.compiler.FieldSpec
 import io.github.composefluent.plugin.build.BuildConfig
 import io.github.composefluent.plugin.build.applyTargets
+import org.gradle.kotlin.dsl.newInstance
+import org.gradle.kotlin.dsl.support.uppercaseFirstChar
+import org.gradle.kotlin.dsl.withType
+import org.jetbrains.compose.desktop.application.dsl.AbstractDistributions
+import org.jetbrains.compose.desktop.application.dsl.AbstractMacOSPlatformSettings
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import org.jetbrains.compose.desktop.application.tasks.AbstractNativeMacApplicationPackageAppDirTask
+import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
+import org.jetbrains.kotlin.gradle.plugin.mpp.Executable
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
+import org.jetbrains.kotlin.konan.target.KonanTarget
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.compose)
+    alias(libs.plugins.compose.multiplatform)
     alias(libs.plugins.compose.hotReload)
     alias(libs.plugins.android.application)
     alias(libs.plugins.ksp)
@@ -28,6 +38,22 @@ kotlin {
         it.binaries.framework {
             baseName = "ComposeApp"
             isStatic = true
+        }
+    }
+
+    listOf(
+        macosX64(),
+        macosArm64()
+    ).forEach {
+        it.binaries {
+            executable {
+                entryPoint = "io.github.composefluent.gallery.main"
+                freeCompilerArgs += listOf(
+                    "-linker-option", "-framework", "-linker-option", "Metal"
+                )
+                // TODO: the current release binary surprises LLVM, so disable checks for now.
+                freeCompilerArgs += "-Xdisable-phases=VerifyBitcode"
+            }
         }
     }
 
@@ -141,11 +167,9 @@ compose.desktop {
             )
         }
         nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "Compose Fluent Design Gallery"
-            packageVersion = BuildConfig.integerVersionName
+            applyDistributions()
             macOS {
-                iconFile.set(project.file("icons/icon.icns"))
+                applyCommonSetup()
                 jvmArgs(
                     "-Dapple.awt.application.appearance=system"
                 )
@@ -159,6 +183,22 @@ compose.desktop {
             }
             linux {
                 iconFile.set(project.file("icons/icon.png"))
+            }
+        }
+    }
+
+    nativeApplication {
+        targets(
+            targets = kotlin.targets.filter {
+                        it.platformType == KotlinPlatformType.native &&
+                                it.name.contains("macos")
+                    }.toTypedArray()
+        )
+
+        distributions {
+            applyDistributions(TargetFormat.Dmg)
+            macOS {
+                applyCommonSetup()
             }
         }
     }
@@ -189,4 +229,85 @@ tasks.withType<KotlinCompilationTask<*>>().configureEach {
     if (name != "kspCommonMainKotlinMetadata") {
         dependsOn("kspCommonMainKotlinMetadata")
     }
+}
+
+fun AbstractDistributions.applyDistributions(
+    vararg formats: TargetFormat = arrayOf(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
+) {
+    targetFormats(formats = formats)
+    packageName = "Compose Fluent Design Gallery"
+    packageVersion = BuildConfig.integerVersionName
+
+}
+
+fun AbstractMacOSPlatformSettings.applyCommonSetup() {
+    iconFile.set(project.file("icons/icon.icns"))
+}
+
+tasks.register("desktopNativeRun") {
+    group = "run"
+    dependsOn(tasks.named("runDebugExecutable${getTarget().uppercaseFirstChar()}"))
+}
+
+listOf("Release", "Debug").forEach { buildType ->
+    listOf("createDistributable", "packageDistribution").forEach { name ->
+        tasks.register("${name}Native${buildType.uppercaseFirstChar()}ForCurrentOS") {
+            group = "compose desktop (native)"
+            val target = getTarget()
+            val taskName = if (name == "packageDistribution") {
+                val targetFormat = compose.desktop.nativeApplication.distributions.targetFormats.first { it.isCompatibleWithCurrentOS }
+                "package${targetFormat.name}Native${buildType}${target.uppercaseFirstChar()}"
+            } else {
+                "${name}Native${buildType}${target.uppercaseFirstChar()}"
+            }
+            dependsOn(tasks.named(taskName))
+        }
+    }
+}
+
+interface Injected {
+    @get:Inject val fs: FileSystemOperations
+}
+
+// Resource processor for macos arm64 target
+kotlin.targets.withType<KotlinNativeTarget> {
+    if (konanTarget === KonanTarget.MACOS_X64 || konanTarget === KonanTarget.MACOS_ARM64) {
+        binaries.withType<Executable> {
+            val packageTasks = tasks.withType<AbstractNativeMacApplicationPackageAppDirTask>()
+            packageTasks.configureEach {
+                val packageTask = this
+                val allResourceFiles: FileCollection = project.files(
+                    (compilation.associatedCompilations + compilation).flatMap { compilation ->
+                        compilation.allKotlinSourceSets.map { it.resources }
+                    }
+                )
+                inputs.files(allResourceFiles)
+                val injected = project.objects.newInstance<Injected>()
+                doLast {
+                    val bundleResourceDir = packageTask.destinationDir.dir("${packageName.get()}.app/Contents/Resources")
+                    val targetPath = bundleResourceDir.get().dir("compose-resources")
+                    injected.fs.copy {
+                        from(allResourceFiles)
+                        into(targetPath)
+                    }
+                    val oldIconFile = bundleResourceDir.get().file("${packageName.get()}.icns")
+                    oldIconFile.asFile.renameTo(bundleResourceDir.get().file(iconFile.get().asFile.name).asFile)
+                }
+
+            }
+        }
+    }
+}
+
+fun getTarget(): String {
+    // 1. 动态确定当前平台对应的 Kotlin/Native 目标名称
+    val os = System.getProperty("os.name")
+    val arch = System.getProperty("os.arch")
+    val currentTargetName = when {
+        os.startsWith("Mac OS X") -> if (arch == "aarch64") "macosArm64" else "macosX64"
+        os.startsWith("Windows") -> "windowsX64"
+        os.startsWith("Linux") -> "linuxX64"
+        else -> throw GradleException("Unsupported OS for native distribution: '$os'")
+    }
+    return currentTargetName
 }
