@@ -54,7 +54,7 @@ repositories {
 Then specify the snapshot dependency with the `-SNAPSHOT` suffix:
 
 ```kotlin
-implementation("io.github.compose-fluent:fluent:0.1.0-SNAPSHOT")
+implementation("io.github.compose-fluent:fluent:0.2.0-SNAPSHOT")
 ```
 
 You can check our latest snapshots at [Maven Central](https://central.sonatype.com/artifact/io.github.compose-fluent/fluent/).
