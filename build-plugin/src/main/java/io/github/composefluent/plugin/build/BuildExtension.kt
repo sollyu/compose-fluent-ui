@@ -8,7 +8,7 @@ import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSetTree
 
 @OptIn(ExperimentalWasmDsl::class, ExperimentalKotlinGradlePluginApi::class)
 fun KotlinMultiplatformExtension.applyTargets(namespaceModule: String = "") {
-    jvm("desktop")
+    jvm()
 
     try {
         androidLibrary {
@@ -29,23 +29,18 @@ fun KotlinMultiplatformExtension.applyTargets(namespaceModule: String = "") {
     macosArm64()
     macosX64()
 
-    applyHierarchyTemplate {
+    applyDefaultHierarchyTemplate {
         sourceSetTrees(KotlinSourceSetTree.main, KotlinSourceSetTree.test)
 
         common {
-            group("skiko") {
-                group("jvm")
-                group("native")
-                group("web")
-            }
-
-            group("android") {
-                withAndroidTarget()
-                withCompilations { it.target.name == "android" }
-            }
-
             group("jvm") {
                 withJvm()
+            }
+
+            group("skiko") {
+                withJvm()
+                group("native")
+                group("web")
             }
 
             group("jvmCommon") {
@@ -53,54 +48,18 @@ fun KotlinMultiplatformExtension.applyTargets(namespaceModule: String = "") {
                 group("android")
             }
 
-            group("web") {
-                withJs()
-                withWasmJs()
-            }
-
-            group("native") {
-                group("apple")
-                group("mingw")
-                group("linux")
-            }
-
-            group("apple") {
-                group("ios")
-                group("macos")
-                group("tvos")
-                group("watchos")
-            }
-
-            group("tvos") {
-                withTvos()
-            }
-
-            group("watchos") {
-                withWatchos()
-            }
-
-            group("ios") {
-                withIos()
-            }
-
-            group("macos") {
-                withMacos()
-            }
-
-            group("mingw") {
-                withMingw()
-            }
-
-            group("linux") {
-                withLinux()
-            }
-
-            group("desktopCommon") {
+            group("desktop") {
                 group("macos")
                 group("mingw")
                 group("linux")
                 group("jvm")
             }
+
+            group("android") {
+                withAndroidTarget()
+                withCompilations { it.target.name == "android" }
+            }
         }
+
     }
 }
