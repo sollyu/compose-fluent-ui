@@ -1,3 +1,5 @@
+@file:Suppress("UNCHECKED_CAST", "INVISIBLE_MEMBER", "INVISIBLE_REFERENCE", "DEPRECATED")
+
 import com.android.build.api.variant.impl.VariantOutputImpl
 import com.codingfeline.buildkonfig.compiler.FieldSpec
 import io.github.composefluent.plugin.build.BuildConfig
@@ -8,6 +10,7 @@ import org.gradle.kotlin.dsl.withType
 import org.jetbrains.compose.desktop.application.dsl.AbstractDistributions
 import org.jetbrains.compose.desktop.application.dsl.AbstractMacOSPlatformSettings
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import org.jetbrains.compose.desktop.application.tasks.AbstractJPackageTask
 import org.jetbrains.compose.desktop.application.tasks.AbstractNativeMacApplicationPackageAppDirTask
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.plugin.mpp.Executable
@@ -244,23 +247,44 @@ fun AbstractMacOSPlatformSettings.applyCommonSetup() {
     iconFile.set(project.file("icons/icon.icns"))
 }
 
-tasks.register("desktopNativeRun") {
-    group = "run"
-    dependsOn(tasks.named("runDebugExecutable${getTarget().uppercaseFirstChar()}"))
-}
+if (getTarget().startsWith("macos")) {
 
-listOf("Release", "Debug").forEach { buildType ->
-    listOf("createDistributable", "packageDistribution").forEach { name ->
-        tasks.register("${name}Native${buildType.uppercaseFirstChar()}ForCurrentOS") {
-            group = "compose desktop (native)"
-            val target = getTarget()
-            val taskName = if (name == "packageDistribution") {
-                val targetFormat = compose.desktop.nativeApplication.distributions.targetFormats.first { it.isCompatibleWithCurrentOS }
-                "package${targetFormat.name}Native${buildType}${target.uppercaseFirstChar()}"
-            } else {
-                "${name}Native${buildType}${target.uppercaseFirstChar()}"
+    project.afterEvaluate {
+
+        listOf(
+            "createDistributable",
+            "createReleaseDistributable",
+        ).forEach { name ->
+            tasks.named<AbstractJPackageTask>(name) {
+                configureMacOSPackageTask(
+                    packageName = packageName,
+                    iconFile = iconFile,
+                    destinationDir = destinationDir,
+                    replaceIconFile = false
+                )
             }
-            dependsOn(tasks.named(taskName))
+        }
+    }
+
+    tasks.register("desktopNativeRun") {
+        group = "run"
+        dependsOn(tasks.named("runDebugExecutable${getTarget().uppercaseFirstChar()}"))
+    }
+
+    listOf("Release", "Debug").forEach { buildType ->
+        listOf("createDistributable", "packageDistribution").forEach { name ->
+            tasks.register("${name}Native${buildType.uppercaseFirstChar()}ForCurrentOS") {
+                group = "compose desktop (native)"
+                val target = getTarget()
+                val taskName = if (name == "packageDistribution") {
+                    val targetFormat =
+                        compose.desktop.nativeApplication.distributions.targetFormats.first { it.isCompatibleWithCurrentOS }
+                    "package${targetFormat.name}Native${buildType}${target.uppercaseFirstChar()}"
+                } else {
+                    "${name}Native${buildType}${target.uppercaseFirstChar()}"
+                }
+                dependsOn(tasks.named(taskName))
+            }
         }
     }
 }
@@ -269,29 +293,69 @@ interface Injected {
     @get:Inject val fs: FileSystemOperations
 }
 
+// apply the icon composer for macos distributable
+fun Task.configureMacOSPackageTask(
+    packageName: Property<String>,
+    iconFile: RegularFileProperty,
+    destinationDir: DirectoryProperty,
+    replaceIconFile: Boolean = false,
+    doLast: (resourceDir: File, injected: Injected) -> Unit = { _, _ -> }
+) {
+    val assetsCarFile = project.file("icons/Assets.car")
+    inputs.file(assetsCarFile)
+    val injected = project.objects.newInstance<Injected>()
+
+    doLast {
+        val appContentDir = destinationDir.get().asFile.resolve("${packageName.get()}.app").resolve("Contents")
+        val bundleResourceDir = appContentDir.resolve("Resources")
+        val infoListFile = appContentDir.resolve("Info.plist")
+        val infoListFileContent = infoListFile.readText()
+        if (!infoListFileContent.contains("CFBundleIconName")) {
+            infoListFile.writeText(
+                text = infoListFileContent.replace(
+                    "<key>CFBundleIconFile</key>","<key>CFBundleIconName</key>\n<string>${iconFile.get().asFile.nameWithoutExtension}</string>\n<key>CFBundleIconFile</key>"
+                )
+            )
+
+        }
+        injected.fs.copy {
+            from(assetsCarFile)
+            into(bundleResourceDir)
+        }
+        if (replaceIconFile) {
+            val oldIconFile = bundleResourceDir.resolve("${packageName}.icns")
+            oldIconFile.renameTo(bundleResourceDir.resolve(iconFile.get().asFile.name))
+        }
+        doLast(bundleResourceDir, injected)
+    }
+}
+
 // Resource processor for macos arm64 target
 kotlin.targets.withType<KotlinNativeTarget> {
     if (konanTarget === KonanTarget.MACOS_X64 || konanTarget === KonanTarget.MACOS_ARM64) {
         binaries.withType<Executable> {
             val packageTasks = tasks.withType<AbstractNativeMacApplicationPackageAppDirTask>()
             packageTasks.configureEach {
-                val packageTask = this
                 val allResourceFiles: FileCollection = project.files(
                     (compilation.associatedCompilations + compilation).flatMap { compilation ->
                         compilation.allKotlinSourceSets.map { it.resources }
                     }
                 )
                 inputs.files(allResourceFiles)
-                val injected = project.objects.newInstance<Injected>()
-                doLast {
-                    val bundleResourceDir = packageTask.destinationDir.dir("${packageName.get()}.app/Contents/Resources")
-                    val targetPath = bundleResourceDir.get().dir("compose-resources")
+
+                configureMacOSPackageTask(
+                    packageName = packageName,
+                    iconFile = iconFile,
+                    destinationDir = destinationDir,
+                    replaceIconFile = true
+                ) { resourceDir, injected ->
+
+                    val targetPath = resourceDir.resolve("compose-resources")
                     injected.fs.copy {
                         from(allResourceFiles)
                         into(targetPath)
                     }
-                    val oldIconFile = bundleResourceDir.get().file("${packageName.get()}.icns")
-                    oldIconFile.asFile.renameTo(bundleResourceDir.get().file(iconFile.get().asFile.name).asFile)
+
                 }
 
             }
