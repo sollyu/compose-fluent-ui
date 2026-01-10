@@ -7,6 +7,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitHorizontalDragOrCancellation
@@ -33,6 +34,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -262,6 +265,8 @@ private fun SliderImpl(
     var widthPx by remember { mutableStateOf(0) }
     val density by rememberUpdatedState(LocalDensity.current)
 
+    val focusRequester = remember { FocusRequester() }
+
     Box(
         content = {
             rail(state)
@@ -290,10 +295,17 @@ private fun SliderImpl(
                 }
             }
             // .semantics {  } // TODO: Slider semantics
+            .focusRequester(focusRequester)
+            .focusable(
+                enabled = enabled,
+                interactionSource = interactionSource
+            )
             .pointerInput(enabled, state.onValueChange) {
                 if (enabled) awaitEachGesture {
                     val down = awaitFirstDown()
                     down.consume()
+
+                    focusRequester.requestFocus()
 
                     val press = PressInteraction.Press(down.position)
                     interactionSource.tryEmit(press)
