@@ -17,7 +17,7 @@ kotlin {
     applyTargets(namespaceModule = ".icons")
     sourceSets {
         commonMain.dependencies {
-            implementation(compose.foundation)
+            implementation(libs.compose.foundation)
         }
     }
 }

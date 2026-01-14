@@ -17,7 +17,7 @@ kotlin {
     applyTargets(namespaceModule = ".icons.extended")
     sourceSets {
         commonMain.dependencies {
-            implementation(compose.foundation)
+            implementation(libs.compose.foundation)
             implementation(project(":fluent-icons-core"))
         }
     }

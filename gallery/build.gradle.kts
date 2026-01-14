@@ -62,11 +62,11 @@ kotlin {
     sourceSets {
         commonMain {
             dependencies {
-                implementation(compose.foundation)
-                implementation(compose.components.resources)
+                implementation(libs.compose.foundation)
+                implementation(libs.compose.components.resources)
                 implementation(project(":fluent"))
                 implementation(project(":fluent-icons-extended"))
-                implementation(compose.uiUtil)
+                implementation(libs.compose.ui.util)
                 implementation(libs.highlights)
                 implementation(project(":source-generated"))
             }
@@ -83,7 +83,7 @@ kotlin {
         }
         jvmMain.dependencies {
             implementation(compose.desktop.currentOs)
-            implementation(compose.preview)
+            implementation(libs.compose.ui.tooling.preview)
             implementation(libs.window.styler)
             implementation(libs.jna.platform)
             implementation(libs.jna)
@@ -335,27 +335,13 @@ kotlin.targets.withType<KotlinNativeTarget> {
         binaries.withType<Executable> {
             val packageTasks = tasks.withType<AbstractNativeMacApplicationPackageAppDirTask>()
             packageTasks.configureEach {
-                val allResourceFiles: FileCollection = project.files(
-                    (compilation.associatedCompilations + compilation).flatMap { compilation ->
-                        compilation.allKotlinSourceSets.map { it.resources }
-                    }
-                )
-                inputs.files(allResourceFiles)
 
                 configureMacOSPackageTask(
                     packageName = packageName,
                     iconFile = iconFile,
                     destinationDir = destinationDir,
                     replaceIconFile = true
-                ) { resourceDir, injected ->
-
-                    val targetPath = resourceDir.resolve("compose-resources")
-                    injected.fs.copy {
-                        from(allResourceFiles)
-                        into(targetPath)
-                    }
-
-                }
+                )
 
             }
         }

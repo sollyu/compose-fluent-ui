@@ -17,9 +17,9 @@ kotlin {
     applyTargets()
     sourceSets {
         commonMain.dependencies {
-            api(compose.foundation)
+            api(libs.compose.foundation)
             api(project(":fluent-icons-core"))
-            implementation(compose.uiUtil)
+            implementation(libs.compose.ui.util)
             implementation(libs.kotlinx.datetime)
             implementation(libs.haze)
         }
