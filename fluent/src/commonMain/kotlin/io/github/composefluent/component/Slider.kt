@@ -385,6 +385,11 @@ class SliderState(
                     valueRange.endInclusive
                 )*/
             valueState = coercedValue
+
+            // When the value is updated externally (not by user dragging), synchronize
+            if (!isDragging) {
+                rawFraction = valueToFraction(coercedValue, valueRange)
+            }
         }
         get() = valueState
 
