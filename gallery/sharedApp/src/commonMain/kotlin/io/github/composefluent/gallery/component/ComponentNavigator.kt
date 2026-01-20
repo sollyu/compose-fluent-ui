@@ -3,8 +3,15 @@ package io.github.composefluent.gallery.component
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSerializable
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavKey
+import androidx.navigation3.runtime.serialization.NavBackStackSerializer
+import androidx.savedstate.serialization.SavedStateConfiguration
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.polymorphic
+import kotlinx.serialization.modules.subclass
 
 interface ComponentNavigator {
 
@@ -18,16 +25,31 @@ interface ComponentNavigator {
 
     val canNavigateUp: Boolean
 
+    companion object {
+        internal val serializersModule = SerializersModule {
+            polymorphic(NavKey::class) {
+                subclass(ComponentItem::class)
+            }
+        }
+    }
+
 }
 
 @Composable
 fun rememberComponentNavigator(startItem: ComponentItem = components.first()): ComponentNavigator {
-    return remember { ComponentNavigatorImpl(startItem) }
+    val navBackStack = rememberSerializable(
+        configuration = SavedStateConfiguration {
+            serializersModule = ComponentNavigator.serializersModule
+        },
+        serializer = NavBackStackSerializer(ComponentItem.serializer()),
+    ) {
+        NavBackStack(startItem)
+    }
+    return remember { ComponentNavigatorImpl(navBackStack) }
 }
 
-private class ComponentNavigatorImpl(startItem: ComponentItem) : ComponentNavigator {
-
-    private val backstack = mutableStateListOf<ComponentItem>().apply { add(startItem) }
+private class ComponentNavigatorImpl(private val backstack: MutableList<ComponentItem>) :
+    ComponentNavigator {
 
     override fun navigate(componentItem: ComponentItem) {
         backstack.add(componentItem)

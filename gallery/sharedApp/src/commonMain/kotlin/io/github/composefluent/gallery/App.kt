@@ -1,6 +1,7 @@
 package io.github.composefluent.gallery
 
-import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -26,11 +27,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import androidx.navigation3.runtime.NavEntry
+import androidx.navigation3.runtime.NavKey
+import androidx.navigation3.scene.Scene
+import androidx.navigation3.scene.SceneStrategy
+import androidx.navigation3.scene.SceneStrategyScope
+import androidx.navigation3.ui.NavDisplay
 import io.github.composefluent.ExperimentalFluentApi
 import io.github.composefluent.FluentTheme
 import io.github.composefluent.animation.FluentDuration
@@ -74,16 +80,6 @@ fun App(
     title: String = "",
 ) {
 
-    var selectedItemWithContent by remember {
-        mutableStateOf(navigator.latestBackEntry)
-    }
-    LaunchedEffect(navigator.latestBackEntry) {
-        val latestBackEntry = navigator.latestBackEntry
-        if (selectedItemWithContent == latestBackEntry) return@LaunchedEffect
-        if (latestBackEntry == null || latestBackEntry.content != null) {
-            selectedItemWithContent = latestBackEntry
-        }
-    }
     var textFieldValue by remember {
         mutableStateOf(TextFieldValue())
     }
@@ -212,35 +208,45 @@ fun App(
             }
         },
         pane = {
-            AnimatedContent(selectedItemWithContent, Modifier.fillMaxSize(), transitionSpec = {
-                (fadeIn(
-                    tween(
-                        FluentDuration.ShortDuration,
-                        easing = FluentEasing.FadeInFadeOutEasing,
-                        delayMillis = FluentDuration.QuickDuration
+            val transitionSpec: AnimatedContentTransitionScope<Scene<ComponentItem>>.() -> ContentTransform =
+                {
+                    (fadeIn(
+                        tween(
+                            FluentDuration.ShortDuration,
+                            easing = FluentEasing.FadeInFadeOutEasing,
+                            delayMillis = FluentDuration.QuickDuration
+                        )
+                    ) + slideInVertically(
+                        tween(
+                            FluentDuration.MediumDuration,
+                            easing = FluentEasing.FastInvokeEasing,
+                            delayMillis = FluentDuration.QuickDuration
+                        )
+                    ) { it / 5 }) togetherWith fadeOut(
+                        tween(
+                            FluentDuration.QuickDuration,
+                            easing = FluentEasing.FadeInFadeOutEasing,
+                            delayMillis = FluentDuration.QuickDuration
+                        )
                     )
-                ) + slideInVertically(
-                    tween(
-                        FluentDuration.MediumDuration,
-                        easing = FluentEasing.FastInvokeEasing,
-                        delayMillis = FluentDuration.QuickDuration
-                    )
-                ) { it / 5 }) togetherWith fadeOut(
-                    tween(
-                        FluentDuration.QuickDuration,
-                        easing = FluentEasing.FadeInFadeOutEasing,
-                        delayMillis = FluentDuration.QuickDuration
-                    )
-                )
-            }) {
-                if (it != null) {
-                    it.content?.invoke(it, navigator)
-                } else {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("No content selected", style = FluentTheme.typography.bodyStrong)
+                }
+            NavDisplay(
+                backStack = navigator.currentBackstack,
+                onBack = { navigator.navigateUp() },
+                transitionSpec = transitionSpec,
+                popTransitionSpec = transitionSpec,
+                sceneStrategy = GallerySceneStrategy(),
+                modifier = Modifier.fillMaxSize(),
+                entryProvider = {
+                    NavEntry(
+                        it,
+                        contentKey = "${it.group}/${it.name}",
+                        metadata = mapOf("hasContent" to (it.content != null))
+                    ) { navKey ->
+                        navKey.content?.invoke(it, navigator)
                     }
                 }
-            }
+            )
         }
     )
 }
@@ -388,4 +394,59 @@ private fun NavigationItem(
             }
         }
     )
+}
+
+private class GallerySceneStrategy<T : NavKey> : SceneStrategy<T> {
+    override fun SceneStrategyScope<T>.calculateScene(entries: List<NavEntry<T>>): Scene<T> {
+        val index = entries.indexOfLast { it.metadata["hasContent"] != false }
+        if (index != -1) {
+            return GallerySingleScene(
+                key = entries[index].contentKey,
+                entry = entries[index],
+                previousEntries = entries.take(index)
+            )
+        } else {
+            return GallerySingleScene(
+                key = entries.last().contentKey,
+                entry = entries.last(),
+                previousEntries = entries.dropLast(1)
+            )
+        }
+
+    }
+
+    class GallerySingleScene<T : NavKey>(
+        override val key: Any,
+        val entry: NavEntry<T>,
+        override val previousEntries: List<NavEntry<T>>,
+    ) : Scene<T> {
+        override val entries: List<NavEntry<T>> = listOf(entry)
+
+        override val content: @Composable () -> Unit = {
+            entry.Content()
+        }
+
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other == null || this::class != other::class) return false
+
+            other as GallerySingleScene<*>
+
+            return key == other.key &&
+                    entry == other.entry &&
+                    previousEntries == other.previousEntries &&
+                    entries == other.entries
+        }
+
+        override fun hashCode(): Int {
+            return key.hashCode() * 31 +
+                    entry.hashCode() * 31 +
+                    previousEntries.hashCode() * 31 +
+                    entries.hashCode() * 31
+        }
+
+        override fun toString(): String {
+            return "SinglePaneScene(key=$key, entry=$entry, previousEntries=$previousEntries, entries=$entries)"
+        }
+    }
 }

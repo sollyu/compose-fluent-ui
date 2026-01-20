@@ -7,6 +7,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.compose.multiplatform)
     alias(libs.plugins.android.kotlin.multiplatform.library)
     alias(libs.plugins.ksp)
@@ -34,6 +35,8 @@ kotlin {
                 implementation(project(":fluent-icons-extended"))
                 implementation(libs.compose.ui.util)
                 implementation(libs.highlights)
+                implementation(libs.androidx.navigation3.ui)
+                implementation(libs.androidx.navigationevent.compose)
                 implementation(project(":source-generated"))
             }
             kotlin.srcDir("build/generated/ksp/metadata/commonMain/kotlin")
