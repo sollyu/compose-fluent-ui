@@ -60,13 +60,26 @@ compose.desktop {
     }
 }
 
-if (getTarget().startsWith("macos")) {
+val target = getTarget()
+if (target.startsWith("macos")) {
+
+    //Workaround for https://youtrack.jetbrains.com/issue/CMP-9568
+    val syncComposeResourceForDebug by tasks.registering(Sync::class) {
+        group = "build"
+        into(layout.buildDirectory.dir("bin/${target}/debugExecutable/compose-resources/composeResources"))
+        from(layout.buildDirectory.dir("kotlin-multiplatform-resources/aggregated-resources/${target}/composeResources"))
+    }
 
     tasks.register("desktopNativeRun") {
         group = "run"
-        dependsOn(tasks.named("runDebugExecutable${getTarget().uppercaseFirstChar()}"))
+        dependsOn(tasks.named("runDebugExecutable${target.uppercaseFirstChar()}") {
+            dependsOn(syncComposeResourceForDebug)
+        })
     }
 
+    tasks.named("linkDebugExecutable${getTarget().uppercaseFirstChar()}") {
+        finalizedBy(syncComposeResourceForDebug)
+    }
     listOf("Release", "Debug").forEach { buildType ->
         listOf("createDistributable", "packageDistribution").forEach { name ->
             tasks.register("${name}Native${buildType.uppercaseFirstChar()}ForCurrentOS") {
