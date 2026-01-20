@@ -13,8 +13,9 @@ import androidx.compose.ui.node.RootNodeOwner
 import androidx.compose.ui.scene.ComposeScene
 import androidx.compose.ui.scene.CopiedList
 import androidx.compose.ui.scene.LocalComposeScene
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.round
 import androidx.compose.ui.util.fastForEachReversed
-import androidx.compose.ui.util.packFloats
 
 @OptIn(InternalComposeUiApi::class)
 @Composable
@@ -83,7 +84,8 @@ internal class PlatformLayersLayoutHitTestOwner(scene: ComposeScene) : ReflectLa
 @OptIn(InternalComposeUiApi::class)
 internal class CanvasLayersLayoutHitTestOwner(private val scene: ComposeScene) : ReflectLayoutHitTestOwner() {
     private val sceneClass = classLoader.loadClass("androidx.compose.ui.scene.CanvasLayersComposeSceneImpl")
-    private val layerClass = sceneClass.declaredClasses.first { it.name == "androidx.compose.ui.scene.CanvasLayersComposeSceneImpl\$AttachedComposeSceneLayer" }
+
+    private val layerClass = sceneClass.classLoader.loadClass($$"androidx.compose.ui.scene.CanvasLayersComposeSceneImpl$AttachedComposeSceneLayer")
 
     private val mainOwnerRef = sceneClass.getDeclaredField("mainOwner").let {
         it.trySetAccessible()
@@ -104,15 +106,18 @@ internal class CanvasLayersLayoutHitTestOwner(private val scene: ComposeScene) :
             trySetAccessible()
         }
 
-    private val layerIsInBoundMethod = layerClass
-        .declaredMethods.first { it.name.startsWith("isInBounds") }.apply {
+    private val boundsInWindow = layerClass
+        .declaredMethods.first {
+            it.name.startsWith("getBoundsInWindow")
+        }.apply {
             trySetAccessible()
         }
 
     override fun hitTest(x: Float, y: Float): Boolean {
         _layers.withCopy {
             it.fastForEachReversed { layer ->
-                if (layerIsInBoundMethod.invoke(layer, packFloats(x, y)) == true) {
+                val bounds = boundsInWindow.invoke(layer) as IntRect
+                if (bounds.contains(Offset(x, y).round())) {
                     return getLayoutNode(layerOwnerField.get(layer) as RootNodeOwner).layoutNodeHitTest(x, y)
                 } else if (layer == focusedLayerField.get(scene)) {
                     return false
