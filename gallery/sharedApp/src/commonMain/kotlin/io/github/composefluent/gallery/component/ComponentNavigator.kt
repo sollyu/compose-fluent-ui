@@ -6,12 +6,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSerializable
 import androidx.navigation3.runtime.NavBackStack
-import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.serialization.NavBackStackSerializer
 import androidx.savedstate.serialization.SavedStateConfiguration
-import kotlinx.serialization.modules.SerializersModule
-import kotlinx.serialization.modules.polymorphic
-import kotlinx.serialization.modules.subclass
 
 interface ComponentNavigator {
 
@@ -25,22 +21,12 @@ interface ComponentNavigator {
 
     val canNavigateUp: Boolean
 
-    companion object {
-        internal val serializersModule = SerializersModule {
-            polymorphic(NavKey::class) {
-                subclass(ComponentItem::class)
-            }
-        }
-    }
-
 }
 
 @Composable
 fun rememberComponentNavigator(startItem: ComponentItem = components.first()): ComponentNavigator {
     val navBackStack = rememberSerializable(
-        configuration = SavedStateConfiguration {
-            serializersModule = ComponentNavigator.serializersModule
-        },
+        configuration = SavedStateConfiguration.DEFAULT,
         serializer = NavBackStackSerializer(ComponentItem.serializer()),
     ) {
         NavBackStack(startItem)

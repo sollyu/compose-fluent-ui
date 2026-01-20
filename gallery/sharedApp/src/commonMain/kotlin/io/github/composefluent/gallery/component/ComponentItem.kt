@@ -24,7 +24,7 @@ class ComponentItem(
 ): NavKey {
 
     companion object {
-        private class ItemSerializer: KSerializer<ComponentItem> {
+        class ItemSerializer: KSerializer<ComponentItem> {
             override val descriptor: SerialDescriptor
                 get() = buildClassSerialDescriptor("ComponentItem") {
                     element("name", String.serializer().descriptor)
