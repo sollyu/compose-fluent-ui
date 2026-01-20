@@ -1,7 +1,7 @@
 [versions]
 activityCompose = "1.12.2"
 haze = "1.7.1"
-kotlin = "2.3.0"
+kotlin = "2.2.20"
 ksp = "2.3.4"
 compose = "1.10.0"
 androidGradlePlugin = "9.0.0"
