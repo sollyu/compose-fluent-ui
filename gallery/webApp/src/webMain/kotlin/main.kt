@@ -5,7 +5,7 @@ import io.github.composefluent.gallery.GalleryTheme
 
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
-    ComposeViewport("ComposeTarget") {
+    ComposeViewport {
         GalleryTheme {
             App()
         }
