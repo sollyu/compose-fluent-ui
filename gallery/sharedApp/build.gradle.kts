@@ -15,7 +15,7 @@ plugins {
 }
 
 kotlin {
-    applyTargets()
+    applyTargets("gallery.shared")
     listOf(
         iosX64(),
         iosArm64(),

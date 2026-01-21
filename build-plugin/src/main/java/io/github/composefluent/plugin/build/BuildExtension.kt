@@ -16,7 +16,7 @@ fun KotlinMultiplatformExtension.applyTargets(namespaceModule: String = "") {
     jvm()
 
     extensions.findByType<KotlinMultiplatformAndroidLibraryTarget>()?.apply {
-        compileSdk = 35
+        compileSdk = BuildConfig.Android.compileSdkVersion
         namespace = "${BuildConfig.packageName}$namespaceModule"
         androidResources.enable = true
     }

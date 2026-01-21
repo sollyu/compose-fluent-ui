@@ -10,7 +10,9 @@ plugins {
 dependencies {
     implementation(project(":gallery:sharedApp"))
     implementation(libs.compose.ui)
+    implementation(libs.compose.foundation)
     implementation(libs.androidx.activity.compose)
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }
 
 android {
@@ -75,8 +77,5 @@ android {
         sourceCompatibility = BuildConfig.Jvm.javaVersion
         targetCompatibility = BuildConfig.Jvm.javaVersion
         isCoreLibraryDesugaringEnabled = true
-    }
-    dependencies {
-        coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     }
 }
