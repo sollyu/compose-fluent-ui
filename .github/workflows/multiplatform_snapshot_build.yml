@@ -24,8 +24,9 @@ on:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
-        type: [PublishLibrary, Android, Windows, Linux, macOS, iOS, WasmJs, Js]
+        type: [PublishLibrary, Android, Windows, Linux, macOS, macosArm64, macosX64, iOS, WasmJs, Js]
         include:
           - type: PublishLibrary
             publish: release
@@ -82,6 +83,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+    env:
+      GRADLE_USER_HOME: ${{ github.workspace }}/.gradle-${{ matrix.type }}
 
     steps:
       - uses: actions/checkout@v4
