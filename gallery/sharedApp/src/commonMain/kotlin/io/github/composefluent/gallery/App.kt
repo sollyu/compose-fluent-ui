@@ -68,8 +68,10 @@ import io.github.composefluent.icons.regular.Settings
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.map
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
-@OptIn(FlowPreview::class, ExperimentalFluentApi::class)
+@OptIn(FlowPreview::class, ExperimentalFluentApi::class, ExperimentalUuidApi::class)
 @Composable
 fun App(
     navigator: ComponentNavigator = rememberComponentNavigator(components.first()),
@@ -240,7 +242,7 @@ fun App(
                 entryProvider = {
                     NavEntry(
                         it,
-                        contentKey = "${it.group}/${it.name}",
+                        contentKey = Uuid.generateV4().toString(),
                         metadata = mapOf("hasContent" to (it.content != null))
                     ) { navKey ->
                         navKey.content?.invoke(it, navigator)
